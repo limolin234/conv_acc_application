@@ -32,9 +32,11 @@ int main(void)
 
     printf("exchange map = %p\n", exch_map);
 
-    tlsf_t pool = tlsf_create_with_pool(exch_map, EXCH_SIZE);
+    tlsf_t pool = tlsf_create_with_pool(exch_map,EXCH_SIZE);
+    instruction* instructions = tlsf_memalign(pool,64,128/8*512);
 
-    munmap(exch_map, EXCH_SIZE);
+    munmap(dma_map, dma_size);
+    munmap(reg_map, reg_size);
     close(fd);
     return 0;
 }
