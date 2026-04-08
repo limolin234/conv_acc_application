@@ -13,11 +13,6 @@
 #define MYCTRL_IOC_GET_REG_PHYS _IOR(MYCTRL_IOC_MAGIC, 2, uint64_t)
 #define MYCTRL_IOC_GET_REG_SIZE _IOR(MYCTRL_IOC_MAGIC, 3, uint32_t)
 
-typedef struct{
-    uint64_t l;
-    uint64_t h;
-}instruction;
-
 int main(void)
 {
     int fd;
@@ -64,8 +59,10 @@ int main(void)
     instruction* instructions = tlsf_memalign(pool,64,128/8*512);
     reg[1] = (uint32_t)instructions;
     reg[2] = 1;
-    instructions[0].l = 0x4ULL;
-    
+    instructions[0] = instruction();
+    reg[0] = 0x00000002;
+
+
     munmap(dma_map, dma_size);
     munmap(reg_map, reg_size);
     close(fd);
