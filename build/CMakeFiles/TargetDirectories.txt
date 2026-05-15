@@ -1,3 +1,4 @@
-/home/limolin/petalinux_application/build/CMakeFiles/DmaApp.dir
-/home/limolin/petalinux_application/build/CMakeFiles/edit_cache.dir
-/home/limolin/petalinux_application/build/CMakeFiles/rebuild_cache.dir
+/home/limolin/MyProjects/dachuang/petalinux_application/build/CMakeFiles/DmaApp.dir
+/home/limolin/MyProjects/dachuang/petalinux_application/build/CMakeFiles/AccUnitTest.dir
+/home/limolin/MyProjects/dachuang/petalinux_application/build/CMakeFiles/edit_cache.dir
+/home/limolin/MyProjects/dachuang/petalinux_application/build/CMakeFiles/rebuild_cache.dir

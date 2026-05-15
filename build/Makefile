@@ -48,19 +48,19 @@ cmake_force:
 SHELL = /bin/sh
 
 # The CMake executable.
-CMAKE_COMMAND = /home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/bin/cmake
+CMAKE_COMMAND = /media/limolin/Disk2/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/bin/cmake
 
 # The command to remove a file.
-RM = /home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/bin/cmake -E rm -f
+RM = /media/limolin/Disk2/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/bin/cmake -E rm -f
 
 # Escaping for special characters.
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/limolin/petalinux_application
+CMAKE_SOURCE_DIR = /home/limolin/MyProjects/dachuang/petalinux_application
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/limolin/petalinux_application/build
+CMAKE_BINARY_DIR = /home/limolin/MyProjects/dachuang/petalinux_application/build
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -68,7 +68,7 @@ CMAKE_BINARY_DIR = /home/limolin/petalinux_application/build
 # Special rule for the target edit_cache
 edit_cache:
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "No interactive CMake dialog available..."
-	/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
+	/media/limolin/Disk2/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
 .PHONY : edit_cache
 
 # Special rule for the target edit_cache
@@ -78,7 +78,7 @@ edit_cache/fast: edit_cache
 # Special rule for the target rebuild_cache
 rebuild_cache:
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake to regenerate build system..."
-	/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/bin/cmake --regenerate-during-build -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
+	/media/limolin/Disk2/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/bin/cmake --regenerate-during-build -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
 .PHONY : rebuild_cache
 
 # Special rule for the target rebuild_cache
@@ -87,9 +87,9 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/limolin/petalinux_application/build/CMakeFiles /home/limolin/petalinux_application/build//CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/limolin/MyProjects/dachuang/petalinux_application/build/CMakeFiles /home/limolin/MyProjects/dachuang/petalinux_application/build//CMakeFiles/progress.marks
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/limolin/petalinux_application/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/limolin/MyProjects/dachuang/petalinux_application/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
@@ -129,6 +129,43 @@ DmaApp/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/DmaApp.dir/build.make CMakeFiles/DmaApp.dir/build
 .PHONY : DmaApp/fast
 
+#=============================================================================
+# Target rules for targets named AccUnitTest
+
+# Build rule for target.
+AccUnitTest: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 AccUnitTest
+.PHONY : AccUnitTest
+
+# fast build rule for target.
+AccUnitTest/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/AccUnitTest.dir/build.make CMakeFiles/AccUnitTest.dir/build
+.PHONY : AccUnitTest/fast
+
+src/acc_unit_test.o: src/acc_unit_test.cpp.o
+.PHONY : src/acc_unit_test.o
+
+# target to build an object file
+src/acc_unit_test.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/AccUnitTest.dir/build.make CMakeFiles/AccUnitTest.dir/src/acc_unit_test.cpp.o
+.PHONY : src/acc_unit_test.cpp.o
+
+src/acc_unit_test.i: src/acc_unit_test.cpp.i
+.PHONY : src/acc_unit_test.i
+
+# target to preprocess a source file
+src/acc_unit_test.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/AccUnitTest.dir/build.make CMakeFiles/AccUnitTest.dir/src/acc_unit_test.cpp.i
+.PHONY : src/acc_unit_test.cpp.i
+
+src/acc_unit_test.s: src/acc_unit_test.cpp.s
+.PHONY : src/acc_unit_test.s
+
+# target to generate assembly for a file
+src/acc_unit_test.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/AccUnitTest.dir/build.make CMakeFiles/AccUnitTest.dir/src/acc_unit_test.cpp.s
+.PHONY : src/acc_unit_test.cpp.s
+
 src/main.o: src/main.cpp.o
 .PHONY : src/main.o
 
@@ -159,6 +196,7 @@ src/tlsf.o: src/tlsf.c.o
 # target to build an object file
 src/tlsf.c.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/DmaApp.dir/build.make CMakeFiles/DmaApp.dir/src/tlsf.c.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/AccUnitTest.dir/build.make CMakeFiles/AccUnitTest.dir/src/tlsf.c.o
 .PHONY : src/tlsf.c.o
 
 src/tlsf.i: src/tlsf.c.i
@@ -167,6 +205,7 @@ src/tlsf.i: src/tlsf.c.i
 # target to preprocess a source file
 src/tlsf.c.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/DmaApp.dir/build.make CMakeFiles/DmaApp.dir/src/tlsf.c.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/AccUnitTest.dir/build.make CMakeFiles/AccUnitTest.dir/src/tlsf.c.i
 .PHONY : src/tlsf.c.i
 
 src/tlsf.s: src/tlsf.c.s
@@ -175,7 +214,35 @@ src/tlsf.s: src/tlsf.c.s
 # target to generate assembly for a file
 src/tlsf.c.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/DmaApp.dir/build.make CMakeFiles/DmaApp.dir/src/tlsf.c.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/AccUnitTest.dir/build.make CMakeFiles/AccUnitTest.dir/src/tlsf.c.s
 .PHONY : src/tlsf.c.s
+
+src/yolo_conv3x3.o: src/yolo_conv3x3.cpp.o
+.PHONY : src/yolo_conv3x3.o
+
+# target to build an object file
+src/yolo_conv3x3.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DmaApp.dir/build.make CMakeFiles/DmaApp.dir/src/yolo_conv3x3.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/AccUnitTest.dir/build.make CMakeFiles/AccUnitTest.dir/src/yolo_conv3x3.cpp.o
+.PHONY : src/yolo_conv3x3.cpp.o
+
+src/yolo_conv3x3.i: src/yolo_conv3x3.cpp.i
+.PHONY : src/yolo_conv3x3.i
+
+# target to preprocess a source file
+src/yolo_conv3x3.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DmaApp.dir/build.make CMakeFiles/DmaApp.dir/src/yolo_conv3x3.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/AccUnitTest.dir/build.make CMakeFiles/AccUnitTest.dir/src/yolo_conv3x3.cpp.i
+.PHONY : src/yolo_conv3x3.cpp.i
+
+src/yolo_conv3x3.s: src/yolo_conv3x3.cpp.s
+.PHONY : src/yolo_conv3x3.s
+
+# target to generate assembly for a file
+src/yolo_conv3x3.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DmaApp.dir/build.make CMakeFiles/DmaApp.dir/src/yolo_conv3x3.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/AccUnitTest.dir/build.make CMakeFiles/AccUnitTest.dir/src/yolo_conv3x3.cpp.s
+.PHONY : src/yolo_conv3x3.cpp.s
 
 # Help Target
 help:
@@ -185,13 +252,20 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
+	@echo "... AccUnitTest"
 	@echo "... DmaApp"
+	@echo "... src/acc_unit_test.o"
+	@echo "... src/acc_unit_test.i"
+	@echo "... src/acc_unit_test.s"
 	@echo "... src/main.o"
 	@echo "... src/main.i"
 	@echo "... src/main.s"
 	@echo "... src/tlsf.o"
 	@echo "... src/tlsf.i"
 	@echo "... src/tlsf.s"
+	@echo "... src/yolo_conv3x3.o"
+	@echo "... src/yolo_conv3x3.i"
+	@echo "... src/yolo_conv3x3.s"
 .PHONY : help
 
 

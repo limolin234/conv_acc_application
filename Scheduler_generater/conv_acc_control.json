@@ -1,0 +1,100 @@
+{
+  "InstructionWidth": 128,
+  "OpcodeWidth": 8,
+  "RegAddrWidth": 8,
+  "PayloadWidth": 120,
+  "System": {
+    "Nop": {},
+    "Sync": {
+      "Deps": ["read_u", "conv_u", "write_back_u"]
+    }
+  },
+  "Pingpongs": {
+    "ipp": {},
+    "opp": {}
+  },
+  "Modules": {
+    "read_u": {
+      "CommandOpcodeWidth": 1,
+      "Command": {
+        "to_ipp": {
+          "Args": [
+            {"Name": "base_addr", "Width": 32, "Default": 0},
+            {"Name": "c_offset", "Width": 32, "Default": 0},
+            {"Name": "h_offset", "Width": 16, "Default": 0},
+            {"Name": "c", "Width": 3},
+            {"Name": "h", "Width": 6},
+            {"Name": "w", "Width": 16}
+          ],
+          "Using": ["ipp"]
+        },
+        "to_opp": {
+          "Args": [
+            {"Name": "base_addr", "Width": 32, "Default": 0},
+            {"Name": "c_offset", "Width": 32, "Default": 0},
+            {"Name": "h_offset", "Width": 16, "Default": 0},
+            {"Name": "c", "Width": 3},
+            {"Name": "h", "Width": 6},
+            {"Name": "w", "Width": 16}
+          ],
+          "Using": ["opp"]
+        }
+      }
+    },
+    "conv_u": {
+      "Command": {
+        "run": {
+          "Args": [
+            {"Name": "h", "Width": 8},
+            {"Name": "w", "Width": 8}
+          ],
+          "Using": ["ipp", "opp"]
+        }
+      },
+      "Regs": {
+        "cfg": [
+          {"Name":"cin_mask","width":4,"Default":"4'b1111"},
+          {"Name":"cout_mask","width":4,"Default":"4'b1111"}
+        ],
+        "kernel0": [{"Name": "data", "Width": 72}],
+        "kernel1": [{"Name": "data", "Width": 72}],
+        "kernel2": [{"Name": "data", "Width": 72}],
+        "kernel3": [{"Name": "data", "Width": 72}],
+        "kernel4": [{"Name": "data", "Width": 72}],
+        "kernel5": [{"Name": "data", "Width": 72}],
+        "kernel6": [{"Name": "data", "Width": 72}],
+        "kernel7": [{"Name": "data", "Width": 72}],
+        "kernel8": [{"Name": "data", "Width": 72}],
+        "kernel9": [{"Name": "data", "Width": 72}],
+        "kernel10": [{"Name": "data", "Width": 72}],
+        "kernel11": [{"Name": "data", "Width": 72}],
+        "kernel12": [{"Name": "data", "Width": 72}],
+        "kernel13": [{"Name": "data", "Width": 72}],
+        "kernel14": [{"Name": "data", "Width": 72}],
+        "kernel15": [{"Name": "data", "Width": 72}]
+      }
+    },
+    "write_back_u": {
+      "Command": {
+        "run": {
+          "Args": [
+            {"Name": "base_addr", "Width": 32, "Default": 0},
+            {"Name": "c_offset", "Width": 32, "Default": 0},
+            {"Name": "h_offset", "Width": 16, "Default": 0},
+            {"Name": "c", "Width": 3},
+            {"Name": "h", "Width": 6},
+            {"Name": "w", "Width": 16}
+          ],
+          "Using": ["opp"]
+        }
+      },
+      "Regs": {
+        "q_cfg": [
+          {"Name": "q_multiplier", "Width": 32, "Signed": true, "Default": "32'sd1"},
+          {"Name": "q_shift", "Width": 6, "Default": "6'd8"},
+          {"Name": "q_zero_point", "Width": 16, "Signed": true, "Default": "16'sd0"}
+        ]
+      }
+    }
+  }
+}

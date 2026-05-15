@@ -1,0 +1,3 @@
+/home/limolin/petalinux_application/build-host/CMakeFiles/rebuild_cache.dir
+/home/limolin/petalinux_application/build-host/CMakeFiles/edit_cache.dir
+/home/limolin/petalinux_application/build-host/CMakeFiles/YoloCppCheck.dir

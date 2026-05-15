@@ -3,6 +3,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/DmaApp.dir/src/main.cpp.o.d"
   "CMakeFiles/DmaApp.dir/src/tlsf.c.o"
   "CMakeFiles/DmaApp.dir/src/tlsf.c.o.d"
+  "CMakeFiles/DmaApp.dir/src/yolo_conv3x3.cpp.o"
+  "CMakeFiles/DmaApp.dir/src/yolo_conv3x3.cpp.o.d"
   "DmaApp"
   "DmaApp.pdb"
 )

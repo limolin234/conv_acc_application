@@ -1,0 +1,20 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+../inc/yolo_conv3x3.hpp
+stddef.h
+-
+stdint.h
+-
+
+/home/limolin/petalinux_application/src/yolo_conv3x3.cpp
+yolo_conv3x3.hpp
+/home/limolin/petalinux_application/src/yolo_conv3x3.hpp
+algorithm
+-
+

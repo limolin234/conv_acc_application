@@ -7,28 +7,28 @@ set(CMAKE_DEPENDS_GENERATOR "Unix Makefiles")
 # The top level Makefile was generated from the following files:
 set(CMAKE_MAKEFILE_DEPENDS
   "CMakeCache.txt"
-  "/home/limolin/petalinux_application/CMakeLists.txt"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeCInformation.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeCXXInformation.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeCommonLanguageInclude.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeGenericSystem.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeInitializeConfigs.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeLanguageInformation.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeSystemSpecificInformation.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeSystemSpecificInitialize.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Compiler/CMakeCommonCompilerMacros.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Compiler/GNU-C.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Compiler/GNU-CXX.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Compiler/GNU.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Platform/Linux-GNU-C.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Platform/Linux-GNU-CXX.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Platform/Linux-GNU.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Platform/Linux.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux-sdk/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Platform/UnixPaths.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux_application/CMakeLists.txt"
   "CMakeFiles/3.24.2/CMakeCCompiler.cmake"
   "CMakeFiles/3.24.2/CMakeCXXCompiler.cmake"
   "CMakeFiles/3.24.2/CMakeSystem.cmake"
-  "/home/limolin/petalinux_application/toolchain.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeCInformation.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeCXXInformation.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeCommonLanguageInclude.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeGenericSystem.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeInitializeConfigs.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeLanguageInformation.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeSystemSpecificInformation.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/CMakeSystemSpecificInitialize.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Compiler/CMakeCommonCompilerMacros.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Compiler/GNU-C.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Compiler/GNU-CXX.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Compiler/GNU.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Platform/Linux-GNU-C.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Platform/Linux-GNU-CXX.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Platform/Linux-GNU.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Platform/Linux.cmake"
-  "/home/limolin/petalinux_project/zynq7020_petalinux/images/linux/sdk/sysroots/x86_64-petalinux-linux/usr/share/cmake-3.24/Modules/Platform/UnixPaths.cmake"
+  "/home/limolin/MyProjects/dachuang/petalinux_application/toolchain.cmake"
   )
 
 # The corresponding makefile is:
@@ -45,4 +45,5 @@ set(CMAKE_MAKEFILE_PRODUCTS
 # Dependency information for all targets:
 set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/DmaApp.dir/DependInfo.cmake"
+  "CMakeFiles/AccUnitTest.dir/DependInfo.cmake"
   )
