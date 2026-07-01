@@ -11,7 +11,7 @@ layer for the currently running bitstream.
 Use these files as the source of truth:
 
 ```text
-../first_SCI_try/experiments/scheduler_gen/spec/conv_acc_control.json
+../scheduler_gen/spec/conv_acc_control.json
 Scheduler_generater/gen_ref/scheduler_control.hpp
 Scheduler_generater/gen_ref/scheduler_core.sv
 Scheduler_generater/gen_ref/scheduler_wrapper.sv
@@ -103,7 +103,7 @@ opcodes or bit fields by hand.
 
 ## Current Generated Commands
 
-From `../first_SCI_try/experiments/scheduler_gen/spec/conv_acc_control.json`:
+From `../scheduler_gen/spec/conv_acc_control.json`:
 
 ```text
 read_u.to_ipp(base_addr, c_offset, h_offset, c, h, w)
@@ -257,7 +257,7 @@ Do not add new user-facing abstractions around legacy opcodes.
 
 ## Refactor Checklist
 
-1. Keep `../first_SCI_try/experiments/scheduler_gen/spec/conv_acc_control.json`
+1. Keep `../scheduler_gen/spec/conv_acc_control.json`
    as the first file to update when command/register semantics change.
 2. Regenerate `Scheduler_generater/gen_ref/scheduler_control.hpp` after spec
    changes.
