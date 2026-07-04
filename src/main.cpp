@@ -1306,10 +1306,18 @@ static void arm_conv_reference_benchmark(const uint8_t* input,
                                          uint8_t* arm_out,
                                          const int8_t kernel[9],
                                          size_t total_tasks,
+                                         uint32_t tasks_per_batch,
                                          uint32_t groups_per_task,
-                                         uint64_t* elapsed_ns) {
+                                         bool verify_all,
+                                         uint64_t* elapsed_ns,
+                                         uint32_t* checked_tasks) {
     const uint64_t t0 = monotonic_ns();
+    uint32_t tasks = 0;
     for (size_t task = 0; task < total_tasks; ++task) {
+        if (!should_verify_task(task, total_tasks, tasks_per_batch,
+                                verify_all)) {
+            continue;
+        }
         uint8_t* out_base = arm_out + task * kOutputBytes;
         for (uint32_t co = 0; co < kChannels; ++co) {
             for (uint32_t y = 0; y < kOutH; ++y) {
@@ -1320,8 +1328,12 @@ static void arm_conv_reference_benchmark(const uint8_t* input,
                 }
             }
         }
+        ++tasks;
     }
     *elapsed_ns = monotonic_ns() - t0;
+    if (checked_tasks) {
+        *checked_tasks = tasks;
+    }
 }
 
 struct conv_throughput_workspace {
@@ -1547,12 +1559,15 @@ static bool run_conv_throughput_core(volatile uint32_t* regs,
     }
 
     uint64_t arm_elapsed_ns = 0;
+    uint32_t arm_checked_tasks = 0;
     arm_conv_reference_benchmark(ws.input, ws.arm_out, kernel, plan.total_tasks,
-                                 groups_per_task, &arm_elapsed_ns);
+                                 plan.tasks_per_batch, groups_per_task,
+                                 verify_all, &arm_elapsed_ns,
+                                 &arm_checked_tasks);
     bool arm_match = true;
     for (size_t task = 0; task < plan.total_tasks && arm_match; ++task) {
-        if (!verify_all &&
-            !should_verify_task(task, plan.total_tasks, plan.tasks_per_batch, false)) {
+        if (!should_verify_task(task, plan.total_tasks, plan.tasks_per_batch,
+                                verify_all)) {
             continue;
         }
         const uint8_t* hw_base = ws.out + task * kOutputBytes;
@@ -1575,7 +1590,11 @@ static bool run_conv_throughput_core(volatile uint32_t* regs,
     const double hw_gmac_s = gmacs / seconds;
     const double mac_per_cycle_100m = hw_gmac_s * 10.0;
     const double util_16mac_cycle = mac_per_cycle_100m / 16.0 * 100.0;
-    const double arm_gmac_s = gmacs / arm_seconds;
+    const uint64_t arm_macs =
+        macs_per_task * static_cast<uint64_t>(arm_checked_tasks);
+    const double arm_gmac_s =
+        (arm_seconds > 0.0) ?
+        (static_cast<double>(arm_macs) / 1000000000.0 / arm_seconds) : 0.0;
     const double speedup = arm_seconds / seconds;
 
     printf("  macs_per_task=%" PRIu64 " total_macs=%" PRIu64 "\n",
@@ -1602,7 +1621,9 @@ static bool run_conv_throughput_core(volatile uint32_t* regs,
     printf("  hw_elapsed=%.6f s\n", seconds);
     printf("  hw_compute=%.3f GMAC/s %.3f GOPS\n",
            hw_gmac_s, gops / seconds);
-    printf("  arm_elapsed=%.6f s\n", arm_seconds);
+    printf("  arm_reference=%s checked_tasks=%u elapsed=%.6f s\n",
+           verify_all ? "all" : "sampled",
+           arm_checked_tasks, arm_seconds);
     printf("  arm_compute=%.3f GMAC/s %.3f GOPS\n",
            arm_gmac_s, arm_gmac_s * 2.0);
     printf("  speedup_vs_arm=%.2fx\n", speedup);
