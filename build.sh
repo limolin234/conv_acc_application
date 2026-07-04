@@ -8,9 +8,10 @@ BUILD_DIR="${BUILD_DIR:-$APP_ROOT/build}"
 HOST_BUILD_DIR="${HOST_BUILD_DIR:-$APP_ROOT/build-host}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 JOBS="${JOBS:-$(nproc)}"
+CMAKE_BIN="${CMAKE_BIN:-/usr/bin/cmake}"
 
 BOARD_USER="${BOARD_USER:-petalinux}"
-BOARD_HOST="${BOARD_HOST:-192.168.1.4}"
+BOARD_HOST="${BOARD_HOST:-192.168.10.2}"
 BOARD_DIR="${BOARD_DIR:-/home/petalinux}"
 RUN_PREFIX="${RUN_PREFIX:-sudo}"
 
@@ -37,9 +38,10 @@ Commands:
 
 Environment overrides:
   SDK_ENV=/path/to/environment-setup-...
+  ALLOW_VITIS_TOOLCHAIN=1  Enable Vitis GNU fallback only for non-board smoke builds.
   BOARD_USER=petalinux BOARD_HOST=192.168.1.4 BOARD_DIR=/home/petalinux
   RUN_PREFIX=sudo     Set RUN_PREFIX= to run without sudo.
-  BUILD_DIR=... HOST_BUILD_DIR=... JOBS=...
+  BUILD_DIR=... HOST_BUILD_DIR=... JOBS=... CMAKE_BIN=/usr/bin/cmake
 
 Examples:
   ./build.sh build
@@ -54,18 +56,18 @@ build_target() {
     load_cross_env
     echo "Using cross environment: $CROSS_ENV_SOURCE"
     reset_stale_cmake_cache "$BUILD_DIR"
-    cmake -S "$APP_ROOT" -B "$BUILD_DIR" \
+    "$CMAKE_BIN" -S "$APP_ROOT" -B "$BUILD_DIR" \
         -DCMAKE_TOOLCHAIN_FILE="$APP_ROOT/toolchain.cmake" \
         -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
-    cmake --build "$BUILD_DIR" -j "$JOBS"
+    "$CMAKE_BIN" --build "$BUILD_DIR" -j "$JOBS"
 }
 
 build_host() {
     reset_stale_cmake_cache "$HOST_BUILD_DIR"
-    cmake -S "$APP_ROOT" -B "$HOST_BUILD_DIR" \
+    "$CMAKE_BIN" -S "$APP_ROOT" -B "$HOST_BUILD_DIR" \
         -DBUILD_HOST_YOLO_CPP=ON \
         -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
-    cmake --build "$HOST_BUILD_DIR" -j "$JOBS"
+    "$CMAKE_BIN" --build "$HOST_BUILD_DIR" -j "$JOBS"
 }
 
 reset_stale_cmake_cache() {
