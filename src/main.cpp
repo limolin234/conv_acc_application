@@ -94,7 +94,7 @@ struct tensors {
 
 static void usage(const char* argv0) {
     fprintf(stderr,
-            "Usage: %s [--quant | --conv | --all | --throughput | --read-bench | --write-bench | --conv-throughput | --conv-throughput-sweep | --writeback-basic | --partial-writeback | --overlap-compare | --yolo-cpp | --yolo-bench] [--timeout-ms N] [--seed N] [--rounds N] [--batches N] [--tasks N] [--groups N] [--sample-verify] [--verify-all] [--dump DIR]\n",
+            "Usage: %s [--quant | --conv | --all | --throughput | --read-bench | --write-bench | --conv-throughput | --conv-throughput-sweep | --conv-pipeline-probe | --writeback-basic | --partial-writeback | --overlap-compare | --yolo-cpp | --yolo-bench] [--timeout-ms N] [--seed N] [--rounds N] [--batches N] [--tasks N] [--groups N] [--sample-verify] [--verify-all] [--dump DIR]\n",
             argv0);
 }
 
@@ -1729,6 +1729,206 @@ static bool run_conv_throughput_sweep(volatile uint32_t* regs,
     return ok;
 }
 
+enum class pipeline_probe_mode {
+    no_write,
+    write_serial,
+    write_prefetch_read0,
+};
+
+static const char* pipeline_probe_name(pipeline_probe_mode mode) {
+    switch (mode) {
+    case pipeline_probe_mode::no_write:
+        return "no_write";
+    case pipeline_probe_mode::write_serial:
+        return "write_serial";
+    case pipeline_probe_mode::write_prefetch_read0:
+        return "write_prefetch_read0";
+    }
+    return "unknown";
+}
+
+static bool push_accumulate_task(lml::instruction_buffer& ins,
+                                 lml::exch_pool& pool,
+                                 uint8_t* input_base,
+                                 uint32_t groups_per_task,
+                                 bool first_read_prefetched) {
+    if (!first_read_prefetched) {
+        if (!ins.push(lml::instr::read_conv(true, pool.phys(input_base),
+                                            false, 0xf, 0xf, kInH, kInW))) {
+            return false;
+        }
+    }
+    if (groups_per_task == 1u) {
+        return ins.push(lml::instr::read_conv(false, pool.phys(input_base),
+                                              true, 0xf, 0xf, kInH, kInW));
+    }
+    for (uint32_t g = 1; g < groups_per_task; ++g) {
+        uint8_t* next_input = input_base + static_cast<size_t>(g) * kInputBytes;
+        if (!ins.push(lml::instr::read_conv(false, pool.phys(next_input),
+                                            true, 0xf, 0xf, kInH, kInW)) ||
+            !ins.push(lml::instr::read_conv(true, pool.phys(next_input),
+                                            false, 0xf, 0xf, kInH, kInW))) {
+            return false;
+        }
+    }
+    uint8_t* last_input =
+        input_base + static_cast<size_t>(groups_per_task - 1u) * kInputBytes;
+    return ins.push(lml::instr::read_conv(false, pool.phys(last_input),
+                                          true, 0xf, 0xf, kInH, kInW));
+}
+
+static bool run_conv_pipeline_probe_case(volatile uint32_t* regs,
+                                         lml::exch_pool& pool,
+                                         uint32_t timeout_ms,
+                                         uint32_t& seed,
+                                         uint32_t batches,
+                                         uint32_t groups_per_task,
+                                         pipeline_probe_mode mode,
+                                         conv_throughput_workspace& ws,
+                                         const conv_throughput_plan& plan) {
+    int8_t kernel[9];
+    for (uint32_t i = 0; i < 9; ++i) {
+        kernel[i] = rand_i8_small(seed);
+    }
+    for (size_t task = 0; task < plan.total_tasks; ++task) {
+        fill_zero_bias(ws.bias + task * kBiasBytes);
+        for (uint32_t g = 0; g < groups_per_task; ++g) {
+            fill_random_input_tile(
+                ws.input + (task * groups_per_task + g) * kInputBytes, seed);
+        }
+    }
+    memset(ws.out, kSentinel, plan.output_bytes + 8);
+    try_msync(pool.virt_base(), pool.bytes(), MS_SYNC);
+
+    size_t global_task = 0;
+    bool read0_prefetched = false;
+    const uint64_t t0 = monotonic_ns();
+    for (uint32_t b = 0; b < batches; ++b) {
+        ws.ins.clear();
+        push_common_regs(ws.ins, kernel);
+        for (uint32_t t = 0; t < plan.tasks_per_batch; ++t) {
+            uint8_t* input_base =
+                ws.input + global_task * groups_per_task * kInputBytes;
+            uint8_t* bias_base = ws.bias + global_task * kBiasBytes;
+            uint8_t* out_base = ws.out + global_task * kOutputBytes;
+
+            if (!ws.ins.push(lml::instr::bias(pool.phys(bias_base),
+                                              kBankStrideBytes,
+                                              kBiasRowStrideBytes,
+                                              kChannels, kOutH,
+                                              kOutW * 4))) {
+                fprintf(stderr, "pipeline-probe instruction overflow\n");
+                return false;
+            }
+            if (!push_accumulate_task(ws.ins, pool, input_base, groups_per_task,
+                                      read0_prefetched)) {
+                fprintf(stderr, "pipeline-probe instruction overflow\n");
+                return false;
+            }
+            read0_prefetched = false;
+            if (groups_per_task > 1u && !ws.ins.push(lml::instr::mode(0x1))) {
+                fprintf(stderr, "pipeline-probe instruction overflow\n");
+                return false;
+            }
+
+            if (mode != pipeline_probe_mode::no_write) {
+                if (!ws.ins.push(lml::instr::write_axi(pool.phys(out_base),
+                                                       kOutputChannelStrideBytes,
+                                                       kOutputRowStrideBytes,
+                                                       kChannels, kOutH,
+                                                       kOutW))) {
+                    fprintf(stderr, "pipeline-probe instruction overflow\n");
+                    return false;
+                }
+                const bool has_next =
+                    (t + 1u < plan.tasks_per_batch) || (b + 1u < batches);
+                if (mode == pipeline_probe_mode::write_prefetch_read0 &&
+                    has_next) {
+                    uint8_t* next_input =
+                        input_base + static_cast<size_t>(groups_per_task) *
+                                         kInputBytes;
+                    if (!ws.ins.push(lml::instr::read_conv(
+                            true, pool.phys(next_input), false, 0xf, 0xf,
+                            kInH, kInW))) {
+                        fprintf(stderr, "pipeline-probe instruction overflow\n");
+                        return false;
+                    }
+                    read0_prefetched = true;
+                }
+            }
+            ++global_task;
+        }
+        if (!ws.ins.push(lml::instr::mode(0x1)) ||
+            !ws.ins.push(lml::instr::mode(0x0))) {
+            fprintf(stderr, "pipeline-probe instruction overflow\n");
+            return false;
+        }
+        try_msync(ws.ins.data(), ws.ins.size() * sizeof(lml::instruction),
+                  MS_SYNC);
+        write_regs_and_start(regs, ws.ins);
+        if (!wait_busy_done(regs, timeout_ms)) {
+            fprintf(stderr, "pipeline-probe %s timeout batch=%u reg0=0x%08x\n",
+                    pipeline_probe_name(mode), b, regs[kRegCtrl]);
+            return false;
+        }
+    }
+    const uint64_t t1 = monotonic_ns();
+
+    const uint64_t macs_per_task =
+        static_cast<uint64_t>(kChannels) * kChannels * groups_per_task *
+        kOutH * kOutW * 9u;
+    const uint64_t total_macs = macs_per_task * plan.total_tasks;
+    const double seconds = static_cast<double>(t1 - t0) / 1000000000.0;
+    const double gmac_s =
+        static_cast<double>(total_macs) / seconds / 1000000000.0;
+    printf("  %-20s elapsed=%.6f s GMAC/s=%.3f GOPS=%.3f util=%.1f%% tasks/s=%.1f ins_last=%zu\n",
+           pipeline_probe_name(mode), seconds, gmac_s, gmac_s * 2.0,
+           (gmac_s * 10.0 / 16.0) * 100.0,
+           static_cast<double>(plan.total_tasks) / seconds, ws.ins.size());
+    return true;
+}
+
+static bool run_conv_pipeline_probe(volatile uint32_t* regs,
+                                    lml::exch_pool& pool,
+                                    uint32_t timeout_ms,
+                                    uint32_t& seed,
+                                    uint32_t batches,
+                                    uint32_t groups_per_task) {
+    conv_throughput_plan plan;
+    if (!make_conv_throughput_plan(batches, groups_per_task, &plan)) {
+        fprintf(stderr, "conv-pipeline-probe allocation plan failed\n");
+        return false;
+    }
+    conv_throughput_workspace ws{
+        lml::instruction_buffer(pool, kMaxInstructions),
+        static_cast<uint8_t*>(pool.alloc(plan.input_bytes + kInputBytes, 64)),
+        static_cast<uint8_t*>(pool.alloc(plan.bias_bytes, 64)),
+        static_cast<uint8_t*>(pool.alloc(plan.output_bytes + 8, 64)),
+        nullptr};
+    if (!ws.ins.valid() || !ws.input || !ws.bias || !ws.out) {
+        fprintf(stderr, "conv-pipeline-probe allocation failed\n");
+        return false;
+    }
+    printf("conv-pipeline-probe:\n");
+    printf("  batches=%u tasks_per_batch=%u total_tasks=%zu groups=%u\n",
+           batches, plan.tasks_per_batch, plan.total_tasks, groups_per_task);
+    bool ok = true;
+    ok = run_conv_pipeline_probe_case(regs, pool, timeout_ms, seed, batches,
+                                      groups_per_task,
+                                      pipeline_probe_mode::no_write, ws,
+                                      plan) && ok;
+    ok = run_conv_pipeline_probe_case(regs, pool, timeout_ms, seed, batches,
+                                      groups_per_task,
+                                      pipeline_probe_mode::write_serial, ws,
+                                      plan) && ok;
+    ok = run_conv_pipeline_probe_case(regs, pool, timeout_ms, seed, batches,
+                                      groups_per_task,
+                                      pipeline_probe_mode::write_prefetch_read0,
+                                      ws, plan) && ok;
+    if (ok) printf("  PASS\n");
+    return ok;
+}
+
 struct acc_device {
     lml::accelerator acc;
     lml::exch_pool* pool = nullptr;
@@ -2426,6 +2626,7 @@ int main(int argc, char** argv) {
     bool run_write_bench = false;
     bool run_conv_tp = false;
     bool run_conv_tp_sweep = false;
+    bool run_conv_pipeline = false;
     bool run_writeback_basic = false;
     bool run_partial_writeback = false;
     bool run_overlap_cmp = false;
@@ -2493,6 +2694,7 @@ int main(int argc, char** argv) {
             run_write_bench = false;
             run_conv_tp = true;
             run_conv_tp_sweep = false;
+            run_conv_pipeline = false;
             run_writeback_basic = false;
             run_partial_writeback = false;
             run_overlap_cmp = false;
@@ -2507,6 +2709,22 @@ int main(int argc, char** argv) {
             run_write_bench = false;
             run_conv_tp = false;
             run_conv_tp_sweep = true;
+            run_conv_pipeline = false;
+            run_writeback_basic = false;
+            run_partial_writeback = false;
+            run_overlap_cmp = false;
+            run_yolo_cpp = false;
+            run_yolo = false;
+            batches = kDefaultConvThroughputBatches;
+        } else if (strcmp(argv[i], "--conv-pipeline-probe") == 0) {
+            run_quant = false;
+            run_conv = false;
+            run_tp = false;
+            run_read_bench = false;
+            run_write_bench = false;
+            run_conv_tp = false;
+            run_conv_tp_sweep = false;
+            run_conv_pipeline = true;
             run_writeback_basic = false;
             run_partial_writeback = false;
             run_overlap_cmp = false;
@@ -2521,6 +2739,7 @@ int main(int argc, char** argv) {
             run_write_bench = false;
             run_conv_tp = false;
             run_conv_tp_sweep = false;
+            run_conv_pipeline = false;
             run_writeback_basic = true;
             run_partial_writeback = false;
             run_overlap_cmp = false;
@@ -2534,6 +2753,7 @@ int main(int argc, char** argv) {
             run_write_bench = false;
             run_conv_tp = false;
             run_conv_tp_sweep = false;
+            run_conv_pipeline = false;
             run_writeback_basic = false;
             run_partial_writeback = true;
             run_overlap_cmp = false;
@@ -2547,6 +2767,7 @@ int main(int argc, char** argv) {
             run_write_bench = false;
             run_conv_tp = false;
             run_conv_tp_sweep = false;
+            run_conv_pipeline = false;
             run_writeback_basic = false;
             run_partial_writeback = false;
             run_overlap_cmp = true;
@@ -2560,6 +2781,7 @@ int main(int argc, char** argv) {
             run_write_bench = false;
             run_conv_tp = false;
             run_conv_tp_sweep = false;
+            run_conv_pipeline = false;
             run_writeback_basic = false;
             run_partial_writeback = false;
             run_overlap_cmp = false;
@@ -2573,6 +2795,7 @@ int main(int argc, char** argv) {
             run_write_bench = false;
             run_conv_tp = false;
             run_conv_tp_sweep = false;
+            run_conv_pipeline = false;
             run_writeback_basic = false;
             run_partial_writeback = false;
             run_overlap_cmp = false;
@@ -2668,6 +2891,10 @@ int main(int argc, char** argv) {
     if (run_conv_tp_sweep) {
         ok = run_conv_throughput_sweep(regs, pool, timeout_ms, seed, batches,
                                        verify_all) && ok;
+    }
+    if (run_conv_pipeline) {
+        ok = run_conv_pipeline_probe(regs, pool, timeout_ms, seed, batches,
+                                     groups) && ok;
     }
     if (run_writeback_basic) {
         ok = test_writeback_basic(regs, pool, t, timeout_ms) && ok;
