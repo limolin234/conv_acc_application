@@ -597,8 +597,9 @@ static bool test_partial_writeback_case(volatile uint32_t* regs,
 
     t.ins.clear();
     t.ins.push(lml::instr::bias(pool.phys(t.bias), kBankStrideBytes,
-                                kBiasRowStrideBytes, kChannels, kOutH,
-                                kOutW * 4));
+                                kBiasRowStrideBytes, kChannels,
+                                static_cast<uint8_t>(H),
+                                static_cast<uint16_t>(W * 4)));
     t.ins.push(lml::instr::write_axi(pool.phys(t.out),
                                      kOutputChannelStrideBytes,
                                      kOutputRowStrideBytes, kChannels,
