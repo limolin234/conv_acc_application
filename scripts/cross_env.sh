@@ -46,7 +46,7 @@ source_petalinux_sdk() {
     local candidate
     local candidates=(
         "$APP_ROOT/toolchains/yocto/environment-setup-cortexa9t2hf-neon-xilinx-linux-gnueabi"
-        "$HOME/peta_prj/ax_peta/components/yocto/environment-setup-cortexa9t2hf-neon-xilinx-linux-gnueabi"
+        "$APP_ROOT/../external/petalinux/peta_prj/ax_peta/components/yocto/environment-setup-cortexa9t2hf-neon-xilinx-linux-gnueabi"
         "$HOME/petalinux_project/zynq7020_petalinux/images/linux/sdk/environment-setup-cortexa9t2hf-neon-xilinx-linux-gnueabi"
     )
 
