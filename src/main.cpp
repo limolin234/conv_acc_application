@@ -94,7 +94,7 @@ struct tensors {
 
 static void usage(const char* argv0) {
     fprintf(stderr,
-            "Usage: %s [--quant | --conv | --all | --throughput | --read-bench | --write-bench | --conv-throughput | --conv-throughput-sweep | --conv-pipeline-probe | --writeback-basic | --partial-writeback | --overlap-compare | --yolo-cpp | --yolo-bench] [--timeout-ms N] [--seed N] [--rounds N] [--batches N] [--tasks N] [--groups N] [--sample-verify] [--verify-all] [--dump DIR]\n",
+            "Usage: %s [--quant | --conv | --all | --throughput | --read-bench | --write-bench | --conv-throughput | --conv-throughput-sweep | --conv-pipeline-probe | --conv-core-probe | --writeback-basic | --partial-writeback | --overlap-compare | --yolo-cpp | --yolo-bench] [--timeout-ms N] [--seed N] [--rounds N] [--batches N] [--tasks N] [--groups N] [--sample-verify] [--verify-all] [--dump DIR]\n",
             argv0);
 }
 
@@ -1929,6 +1929,105 @@ static bool run_conv_pipeline_probe(volatile uint32_t* regs,
     return ok;
 }
 
+static bool run_conv_core_probe(volatile uint32_t* regs,
+                                lml::exch_pool& pool,
+                                uint32_t timeout_ms,
+                                uint32_t& seed,
+                                uint32_t batches,
+                                uint32_t convs_per_batch) {
+    if (batches == 0 || convs_per_batch == 0) {
+        return true;
+    }
+    const uint32_t fixed_instructions = kChannels * kChannels + 1u + 4u;
+    const uint32_t max_convs = kMaxInstructions - fixed_instructions;
+    if (convs_per_batch > max_convs) {
+        fprintf(stderr, "conv-core-probe tasks=%u exceeds max %u\n",
+                convs_per_batch, max_convs);
+        return false;
+    }
+
+    lml::instruction_buffer ins(pool, kMaxInstructions);
+    auto* input = static_cast<uint8_t*>(pool.alloc(kInputBytes, 64));
+    auto* bias = static_cast<uint8_t*>(pool.alloc(kBiasBytes, 64));
+    if (!ins.valid() || !input || !bias) {
+        fprintf(stderr, "conv-core-probe allocation failed\n");
+        return false;
+    }
+    fill_random_input_tile(input, seed);
+    fill_zero_bias(bias);
+
+    int8_t kernel[9];
+    for (uint32_t i = 0; i < 9; ++i) {
+        kernel[i] = rand_i8_small(seed);
+    }
+
+    printf("conv-core-probe:\n");
+    printf("  batches=%u convs_per_batch=%u total_convs=%" PRIu64 "\n",
+           batches, convs_per_batch,
+           static_cast<uint64_t>(batches) * convs_per_batch);
+    printf("  one conv: 4out x 4in x %ux%u x 3x3 MACs\n", kOutH, kOutW);
+    printf("  instruction_count_per_batch=%u max=%u\n",
+           fixed_instructions + convs_per_batch, kMaxInstructions);
+    print_addr_range("input", pool.phys(input), kInputBytes);
+    print_addr_range("bias", pool.phys(bias), kBiasBytes);
+
+    try_msync(pool.virt_base(), pool.bytes(), MS_SYNC);
+
+    const uint64_t t0 = monotonic_ns();
+    for (uint32_t b = 0; b < batches; ++b) {
+        ins.clear();
+        push_common_regs(ins, kernel);
+        if (!ins.push(lml::instr::bias(pool.phys(bias), kBankStrideBytes,
+                                       kBiasRowStrideBytes, kChannels, kOutH,
+                                       kOutW * 4)) ||
+            !ins.push(lml::instr::read_conv(true, pool.phys(input), false,
+                                            0xf, 0xf, kInH, kInW))) {
+            fprintf(stderr, "conv-core-probe instruction overflow\n");
+            return false;
+        }
+        for (uint32_t i = 0; i < convs_per_batch; ++i) {
+            if (!ins.push(lml::instr::read_conv(false, pool.phys(input), true,
+                                                0xf, 0xf, kInH, kInW))) {
+                fprintf(stderr, "conv-core-probe instruction overflow\n");
+                return false;
+            }
+        }
+        if (!ins.push(lml::instr::mode(0x1)) ||
+            !ins.push(lml::instr::mode(0x0))) {
+            fprintf(stderr, "conv-core-probe instruction overflow\n");
+            return false;
+        }
+
+        try_msync(ins.data(), ins.size() * sizeof(lml::instruction), MS_SYNC);
+        write_regs_and_start(regs, ins);
+        if (!wait_busy_done(regs, timeout_ms)) {
+            fprintf(stderr, "conv-core-probe timeout batch=%u reg0=0x%08x\n",
+                    b, regs[kRegCtrl]);
+            return false;
+        }
+    }
+    const uint64_t t1 = monotonic_ns();
+
+    const uint64_t macs_per_conv =
+        static_cast<uint64_t>(kChannels) * kChannels * kOutH * kOutW * 9u;
+    const uint64_t total_convs =
+        static_cast<uint64_t>(batches) * convs_per_batch;
+    const uint64_t total_macs = macs_per_conv * total_convs;
+    const double seconds = static_cast<double>(t1 - t0) / 1000000000.0;
+    const double gmac_s =
+        static_cast<double>(total_macs) / seconds / 1000000000.0;
+    const double us_per_conv = seconds * 1000000.0 /
+                               static_cast<double>(total_convs);
+    printf("  macs_per_conv=%" PRIu64 " total_macs=%" PRIu64 "\n",
+           macs_per_conv, total_macs);
+    printf("  elapsed=%.6f s us_per_conv=%.3f\n", seconds, us_per_conv);
+    printf("  conv_core=%.3f GMAC/s %.3f GOPS util=%.1f%%\n",
+           gmac_s, gmac_s * 2.0, (gmac_s * 10.0 / 16.0) * 100.0);
+    printf("  reg0=0x%08x\n", regs[kRegCtrl]);
+    printf("  PASS\n");
+    return true;
+}
+
 struct acc_device {
     lml::accelerator acc;
     lml::exch_pool* pool = nullptr;
@@ -2627,6 +2726,7 @@ int main(int argc, char** argv) {
     bool run_conv_tp = false;
     bool run_conv_tp_sweep = false;
     bool run_conv_pipeline = false;
+    bool run_conv_core = false;
     bool run_writeback_basic = false;
     bool run_partial_writeback = false;
     bool run_overlap_cmp = false;
@@ -2695,6 +2795,7 @@ int main(int argc, char** argv) {
             run_conv_tp = true;
             run_conv_tp_sweep = false;
             run_conv_pipeline = false;
+            run_conv_core = false;
             run_writeback_basic = false;
             run_partial_writeback = false;
             run_overlap_cmp = false;
@@ -2710,6 +2811,7 @@ int main(int argc, char** argv) {
             run_conv_tp = false;
             run_conv_tp_sweep = true;
             run_conv_pipeline = false;
+            run_conv_core = false;
             run_writeback_basic = false;
             run_partial_writeback = false;
             run_overlap_cmp = false;
@@ -2725,6 +2827,23 @@ int main(int argc, char** argv) {
             run_conv_tp = false;
             run_conv_tp_sweep = false;
             run_conv_pipeline = true;
+            run_conv_core = false;
+            run_writeback_basic = false;
+            run_partial_writeback = false;
+            run_overlap_cmp = false;
+            run_yolo_cpp = false;
+            run_yolo = false;
+            batches = kDefaultConvThroughputBatches;
+        } else if (strcmp(argv[i], "--conv-core-probe") == 0) {
+            run_quant = false;
+            run_conv = false;
+            run_tp = false;
+            run_read_bench = false;
+            run_write_bench = false;
+            run_conv_tp = false;
+            run_conv_tp_sweep = false;
+            run_conv_pipeline = false;
+            run_conv_core = true;
             run_writeback_basic = false;
             run_partial_writeback = false;
             run_overlap_cmp = false;
@@ -2740,6 +2859,7 @@ int main(int argc, char** argv) {
             run_conv_tp = false;
             run_conv_tp_sweep = false;
             run_conv_pipeline = false;
+            run_conv_core = false;
             run_writeback_basic = true;
             run_partial_writeback = false;
             run_overlap_cmp = false;
@@ -2754,6 +2874,7 @@ int main(int argc, char** argv) {
             run_conv_tp = false;
             run_conv_tp_sweep = false;
             run_conv_pipeline = false;
+            run_conv_core = false;
             run_writeback_basic = false;
             run_partial_writeback = true;
             run_overlap_cmp = false;
@@ -2768,6 +2889,7 @@ int main(int argc, char** argv) {
             run_conv_tp = false;
             run_conv_tp_sweep = false;
             run_conv_pipeline = false;
+            run_conv_core = false;
             run_writeback_basic = false;
             run_partial_writeback = false;
             run_overlap_cmp = true;
@@ -2782,6 +2904,7 @@ int main(int argc, char** argv) {
             run_conv_tp = false;
             run_conv_tp_sweep = false;
             run_conv_pipeline = false;
+            run_conv_core = false;
             run_writeback_basic = false;
             run_partial_writeback = false;
             run_overlap_cmp = false;
@@ -2796,6 +2919,7 @@ int main(int argc, char** argv) {
             run_conv_tp = false;
             run_conv_tp_sweep = false;
             run_conv_pipeline = false;
+            run_conv_core = false;
             run_writeback_basic = false;
             run_partial_writeback = false;
             run_overlap_cmp = false;
@@ -2895,6 +3019,10 @@ int main(int argc, char** argv) {
     if (run_conv_pipeline) {
         ok = run_conv_pipeline_probe(regs, pool, timeout_ms, seed, batches,
                                      groups) && ok;
+    }
+    if (run_conv_core) {
+        ok = run_conv_core_probe(regs, pool, timeout_ms, seed, batches,
+                                 tasks) && ok;
     }
     if (run_writeback_basic) {
         ok = test_writeback_basic(regs, pool, t, timeout_ms) && ok;
