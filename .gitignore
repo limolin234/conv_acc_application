@@ -1,0 +1,13 @@
+build/
+build-host/
+toolchains/*
+!toolchains/
+!toolchains/README.md
+
+__pycache__/
+*.py[cod]
+
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
