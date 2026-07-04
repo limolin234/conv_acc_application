@@ -1352,15 +1352,22 @@ struct conv_throughput_plan {
     size_t output_bytes = 0;
 };
 
+static uint32_t conv_throughput_instructions_per_task(uint32_t groups_per_task) {
+    if (groups_per_task == 0) return 0;
+    if (groups_per_task == 1) {
+        return 5u;  // bias, read, conv, write, bias-reset
+    }
+    return 2u * groups_per_task + 4u;
+}
+
 static bool make_conv_throughput_plan(uint32_t batches, uint32_t groups_per_task,
                                       conv_throughput_plan* plan) {
     if (!plan || batches == 0 || groups_per_task == 0) {
         return false;
     }
 
-    const uint32_t instructions_per_task = 2u + groups_per_task + 1u +
-                                           ((groups_per_task > 1u) ? 1u : 0u) +
-                                           2u;
+    const uint32_t instructions_per_task =
+        conv_throughput_instructions_per_task(groups_per_task);
     const uint32_t fixed_instructions = kChannels * kChannels + 1u + 2u;
     if (fixed_instructions + instructions_per_task > kMaxInstructions) {
         return false;
@@ -1424,8 +1431,8 @@ static bool run_conv_throughput_core(volatile uint32_t* regs,
            groups_per_task * kChannels, kOutH, kOutW);
     printf("  instruction_count_per_batch=%u max=%u\n",
            1u + kChannels * kChannels +
-               plan.tasks_per_batch * (2u + groups_per_task + 1u +
-                                       ((groups_per_task > 1u) ? 1u : 0u) + 2u) +
+               plan.tasks_per_batch *
+                   conv_throughput_instructions_per_task(groups_per_task) +
                2u,
            kMaxInstructions);
     printf("  verify=%s\n", verify_all ? "all outputs" : "sampled first/last/per-batch outputs");
@@ -1454,22 +1461,34 @@ static bool run_conv_throughput_core(volatile uint32_t* regs,
             ws.ins.push(lml::instr::bias(pool.phys(bias_base), kBankStrideBytes,
                                       kBiasRowStrideBytes, kChannels, kOutH,
                                       kOutW * 4));
-            for (uint32_t g = 0; g < groups_per_task; ++g) {
+            if (groups_per_task == 1u) {
                 uint8_t* input_base =
-                    ws.input + (global_task * groups_per_task + g) * kInputBytes;
+                    ws.input + global_task * groups_per_task * kInputBytes;
                 ws.ins.push(lml::instr::read_conv(true, pool.phys(input_base),
-                                               g == 0 ? false : true,
-                                               0xf, 0xf, kInH, kInW));
-            }
-            if (groups_per_task != 0) {
+                                               false, 0xf, 0xf, kInH, kInW));
+                ws.ins.push(lml::instr::read_conv(false, pool.phys(input_base),
+                                               true, 0xf, 0xf, kInH, kInW));
+            } else {
+                uint8_t* first_input_base =
+                    ws.input + global_task * groups_per_task * kInputBytes;
+                ws.ins.push(lml::instr::read_conv(true, pool.phys(first_input_base),
+                                               false, 0xf, 0xf, kInH, kInW));
+                for (uint32_t g = 1; g < groups_per_task; ++g) {
+                    uint8_t* next_input_base =
+                        ws.input + (global_task * groups_per_task + g) * kInputBytes;
+                    ws.ins.push(lml::instr::read_conv(
+                        false, pool.phys(next_input_base), true, 0xf, 0xf,
+                        kInH, kInW));
+                    ws.ins.push(lml::instr::read_conv(
+                        true, pool.phys(next_input_base), false, 0xf, 0xf,
+                        kInH, kInW));
+                }
                 uint8_t* last_input_base =
                     ws.input + (global_task * groups_per_task +
                              (groups_per_task - 1u)) * kInputBytes;
                 ws.ins.push(lml::instr::read_conv(false, pool.phys(last_input_base),
                                                true, 0xf, 0xf, kInH, kInW));
-                if (groups_per_task > 1u) {
-                    ws.ins.push(lml::instr::mode(0x1));
-                }
+                ws.ins.push(lml::instr::mode(0x1));
             }
             ws.ins.push(lml::instr::write_axi(pool.phys(out_base),
                                            kOutputChannelStrideBytes,
@@ -1672,8 +1691,8 @@ static bool run_conv_throughput_sweep(volatile uint32_t* regs,
     uint32_t max_output_tasks = 0;
     for (uint32_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i) {
         const uint32_t groups = candidates[i];
-        const uint32_t instructions_per_task = 2u + groups + 1u +
-                                               ((groups > 1u) ? 1u : 0u) + 2u;
+        const uint32_t instructions_per_task =
+            conv_throughput_instructions_per_task(groups);
         const uint32_t fixed_instructions = kChannels * kChannels + 1u + 2u;
         const uint32_t tasks_per_batch =
             (kMaxInstructions - fixed_instructions) / instructions_per_task;
@@ -1989,16 +2008,18 @@ static bool run_acc_conv_tile_batch(acc_device& dev, const uint8_t* input,
             for (uint32_t g = 1; g < groups; ++g) {
                 uint8_t* tile_input =
                     batch_inputs + (j * groups + g) * kInputBytes;
-                if (!push_checked(lml::instr::read_conv(true, dev.phys(tile_input),
+                if (!push_checked(lml::instr::read_conv(false,
+                                                        dev.phys(tile_input),
                                                         true, 0xf, 0xf,
+                                                        kInH, kInW)) ||
+                    !push_checked(lml::instr::read_conv(true,
+                                                        dev.phys(tile_input),
+                                                        false, 0xf, 0xf,
                                                         kInH, kInW))) {
                     return false;
                 }
-                if (g + 1u < groups) {
-                    if (!push_kernel_group(g)) return false;
-                }
+                if (!push_kernel_group(g)) return false;
             }
-            if (!push_kernel_group(groups - 1u)) return false;
             uint8_t* last_tile_input =
                 batch_inputs + (j * groups + (groups - 1u)) * kInputBytes;
             if (!push_checked(lml::instr::read_conv(false,
