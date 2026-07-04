@@ -6,14 +6,14 @@ APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SDK_ENV="${SDK_ENV:-}"
 BUILD_DIR="${BUILD_DIR:-$APP_ROOT/build}"
 HOST_BUILD_DIR="${HOST_BUILD_DIR:-$APP_ROOT/build-host}"
-BUILD_TYPE="${BUILD_TYPE:-Release}"
+BUILD_TYPE="${BUILD_TYPE:-}"
 JOBS="${JOBS:-$(nproc)}"
 CMAKE_BIN="${CMAKE_BIN:-/usr/bin/cmake}"
 
 BOARD_USER="${BOARD_USER:-petalinux}"
 BOARD_HOST="${BOARD_HOST:-192.168.10.2}"
 BOARD_DIR="${BOARD_DIR:-/home/petalinux}"
-RUN_PREFIX="${RUN_PREFIX:-sudo}"
+RUN_PREFIX="${RUN_PREFIX-sudo}"
 
 TARGET_APPS=(DmaApp AccUnitTest)
 

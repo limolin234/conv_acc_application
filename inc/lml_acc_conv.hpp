@@ -18,6 +18,7 @@ namespace lml {
 static constexpr uint32_t kDefaultExchPhysAddr = 0x30000000u;
 static constexpr uint8_t kDefaultConvInputH = 32;
 static constexpr uint8_t kDefaultConvInputW = 32;
+static constexpr uint32_t kDefaultTensorChannelStrideBytes = 512 * 16;
 
 struct instruction {
     uint64_t lo;
@@ -141,66 +142,122 @@ static inline void set_field(uint64_t& hi, uint64_t& lo, uint8_t lsb,
 static inline instruction mode(uint8_t op) {
     uint64_t hi = 0;
     uint64_t lo = 0;
-    set_field(hi, lo, 124, 4, op & 0x0fu);
+    set_field(hi, lo, 120, 8, op);
     return raw(hi, lo);
+}
+
+static inline instruction nop() {
+    return mode(0x00u);
+}
+
+static inline instruction sync() {
+    return mode(0x01u);
 }
 
 static inline instruction regs(uint8_t addr, uint64_t data_lo,
                                uint16_t data_hi = 0) {
     uint64_t hi = 0;
-    uint64_t lo = data_lo;
-    set_field(hi, lo, 124, 4, 0x5u);
-    set_field(hi, lo, 112, 8, addr);
-    set_field(hi, lo, 64, 16, data_hi);
+    uint64_t lo = 0;
+    set_field(hi, lo, 120, 8, 0x02u);
+    set_field(hi, lo, 112, 8, static_cast<uint8_t>(addr + 1u));
+    set_field(hi, lo, 40, 64, data_lo);
+    set_field(hi, lo, 104, 8, data_hi & 0x00ffu);
     return raw(hi, lo);
 }
 
 static inline instruction write_back_config(int32_t q_multiplier,
                                             uint8_t q_shift,
                                             int16_t q_zero_point) {
-    uint64_t data = 0;
-    data |= static_cast<uint64_t>(static_cast<uint32_t>(q_multiplier)) << 32;
-    data |= static_cast<uint64_t>(q_shift & 0x3fu) << 16;
-    data |= static_cast<uint64_t>(static_cast<uint16_t>(q_zero_point));
-    return regs(130, data, 0);
+    uint64_t hi = 0;
+    uint64_t lo = 0;
+    set_field(hi, lo, 120, 8, 0x02u);
+    set_field(hi, lo, 112, 8, 17u);
+    set_field(hi, lo, 80, 32, static_cast<uint32_t>(q_multiplier));
+    set_field(hi, lo, 74, 6, q_shift & 0x3fu);
+    set_field(hi, lo, 58, 16, static_cast<uint16_t>(q_zero_point));
+    return raw(hi, lo);
 }
 
 static inline instruction config_regs(uint32_t c_offset, uint16_t h_offset,
                                       uint8_t c, uint8_t h, uint16_t w) {
-    uint64_t data = 0;
-    data |= static_cast<uint64_t>(c_offset & 0x01ffffffu) << 34;
-    data |= static_cast<uint64_t>(h_offset & 0x1fffu) << 21;
-    data |= static_cast<uint64_t>(c & 0x07u) << 18;
-    data |= static_cast<uint64_t>(h & 0x3fu) << 12;
-    data |= static_cast<uint64_t>(w & 0x0fffu);
-    return regs(128, data, 0);
+    (void)c_offset;
+    (void)h_offset;
+    (void)h;
+    (void)w;
+    const uint8_t mask = (c >= 4u) ? 0x0fu : static_cast<uint8_t>((1u << c) - 1u);
+    uint64_t hi = 0;
+    uint64_t lo = 0;
+    set_field(hi, lo, 120, 8, 0x02u);
+    set_field(hi, lo, 112, 8, 0u);
+    set_field(hi, lo, 108, 4, mask);
+    set_field(hi, lo, 104, 4, mask);
+    return raw(hi, lo);
 }
 
-static inline instruction mem(uint8_t op, uint32_t base_addr,
+static inline instruction conv_config(uint8_t ci_mask, uint8_t co_mask) {
+    uint64_t hi = 0;
+    uint64_t lo = 0;
+    set_field(hi, lo, 120, 8, 0x02u);
+    set_field(hi, lo, 112, 8, 0u);
+    set_field(hi, lo, 108, 4, ci_mask & 0x0fu);
+    set_field(hi, lo, 104, 4, co_mask & 0x0fu);
+    return raw(hi, lo);
+}
+
+static inline instruction mem(uint8_t op, uint8_t cmd, uint32_t base_addr,
                               uint32_t c_offset, uint16_t h_offset,
                               uint8_t c, uint8_t h, uint16_t w) {
     uint64_t hi = 0;
     uint64_t lo = 0;
-    set_field(hi, lo, 124, 4, op & 0x0fu);
-    set_field(hi, lo, 88, 32, base_addr);
-    set_field(hi, lo, 63, 25, c_offset & 0x01ffffffu);
-    set_field(hi, lo, 50, 13, h_offset & 0x1fffu);
-    set_field(hi, lo, 47, 3, c & 0x07u);
-    set_field(hi, lo, 41, 6, h & 0x3fu);
-    set_field(hi, lo, 29, 12, w & 0x0fffu);
+    set_field(hi, lo, 120, 8, op);
+    set_field(hi, lo, 119, 1, cmd & 0x01u);
+    set_field(hi, lo, 87, 32, base_addr);
+    set_field(hi, lo, 55, 32, c_offset);
+    set_field(hi, lo, 39, 16, h_offset);
+    set_field(hi, lo, 36, 3, c & 0x07u);
+    set_field(hi, lo, 30, 6, h & 0x3fu);
+    set_field(hi, lo, 14, 16, w);
     return raw(hi, lo);
+}
+
+static inline instruction read_to_ipp(uint32_t base_addr, uint32_t c_offset,
+                                      uint16_t h_offset, uint8_t c, uint8_t h,
+                                      uint16_t w) {
+    return mem(0x03u, 0u, base_addr, c_offset, h_offset, c, h, w);
+}
+
+static inline instruction read_to_opp(uint32_t base_addr, uint32_t c_offset,
+                                      uint16_t h_offset, uint8_t c, uint8_t h,
+                                      uint16_t w) {
+    return mem(0x03u, 1u, base_addr, c_offset, h_offset, c, h, w);
 }
 
 static inline instruction bias(uint32_t base_addr, uint32_t c_offset,
                                uint16_t h_offset, uint8_t c, uint8_t h,
                                uint16_t w) {
-    return mem(0x2, base_addr, c_offset, h_offset, c, h, w);
+    return read_to_opp(base_addr, c_offset, h_offset, c, h, w);
+}
+
+static inline instruction write_back(uint32_t base_addr, uint32_t c_offset,
+                                     uint16_t h_offset, uint8_t c, uint8_t h,
+                                     uint16_t w) {
+    return mem(0x05u, 0u, base_addr, c_offset, h_offset, c, h, w);
 }
 
 static inline instruction write_axi(uint32_t base_addr, uint32_t c_offset,
                                     uint16_t h_offset, uint8_t c, uint8_t h,
                                     uint16_t w) {
-    return mem(0x3, base_addr, c_offset, h_offset, c, h, w);
+    return write_back(base_addr, c_offset, h_offset, c, h, w);
+}
+
+static inline instruction conv_run(uint8_t h, uint8_t w) {
+    uint64_t hi = 0;
+    uint64_t lo = 0;
+    set_field(hi, lo, 120, 8, 0x04u);
+    set_field(hi, lo, 119, 1, 0u);
+    set_field(hi, lo, 111, 8, h);
+    set_field(hi, lo, 103, 8, w);
+    return raw(hi, lo);
 }
 
 static inline instruction read_conv(bool read_en, uint32_t base_addr,
@@ -208,17 +265,16 @@ static inline instruction read_conv(bool read_en, uint32_t base_addr,
                                     uint8_t co_mask,
                                     uint8_t h = kDefaultConvInputH,
                                     uint8_t w = kDefaultConvInputW) {
-    uint64_t hi = 0;
-    uint64_t lo = 0;
-    set_field(hi, lo, 124, 4, 0x4u);
-    set_field(hi, lo, 119, 1, read_en ? 1u : 0u);
-    set_field(hi, lo, 87, 32, base_addr);
-    set_field(hi, lo, 59, 1, conv_en ? 1u : 0u);
-    set_field(hi, lo, 55, 4, ci_mask & 0x0fu);
-    set_field(hi, lo, 51, 4, co_mask & 0x0fu);
-    set_field(hi, lo, 43, 8, h);
-    set_field(hi, lo, 35, 8, w);
-    return raw(hi, lo);
+    (void)ci_mask;
+    (void)co_mask;
+    if (read_en) {
+        return read_to_ipp(base_addr, kDefaultTensorChannelStrideBytes, w,
+                           4, h, w);
+    }
+    if (conv_en) {
+        return conv_run(h, w);
+    }
+    return nop();
 }
 
 } // namespace instr

@@ -72,6 +72,7 @@ public:
                push(instr::read_conv(true, task.input_phys, false,
                                      task.ci_mask, task.co_mask,
                                      task.shape.in_h, task.shape.in_w)) &&
+               push(instr::conv_config(task.ci_mask, task.co_mask)) &&
                push(instr::read_conv(false, task.input_phys, true,
                                      task.ci_mask, task.co_mask,
                                      task.shape.in_h, task.shape.in_w)) &&
